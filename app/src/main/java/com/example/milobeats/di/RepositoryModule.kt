@@ -1,8 +1,7 @@
 package com.example.milobeats.di
 
-import com.example.milobeats.data.api.LastFmApiService
-import com.example.milobeats.data.repository.TrackRepository
 import com.example.milobeats.data.repository.TrackRepositoryImpl
+import com.example.milobeats.domain.repository.TrackRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn

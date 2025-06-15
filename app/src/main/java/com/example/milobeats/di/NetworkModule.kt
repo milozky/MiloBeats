@@ -1,6 +1,8 @@
 package com.example.milobeats.di
 
-import com.example.milobeats.data.api.LastFmApiService
+import com.example.milobeats.LastFmApiService
+import com.example.milobeats.data.model.TrackSearchResponse
+import com.example.milobeats.data.util.TrackSearchResponseTypeAdapter
 import com.google.gson.GsonBuilder
 import dagger.Module
 import dagger.Provides
@@ -16,16 +18,16 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideGson() = GsonBuilder()
-        .setLenient()
+    fun provideGson(): com.google.gson.Gson = GsonBuilder()
+        .registerTypeAdapter(TrackSearchResponse::class.java, TrackSearchResponseTypeAdapter())
         .create()
 
     @Provides
     @Singleton
-    fun provideRetrofit(gson: GsonBuilder): Retrofit {
+    fun provideRetrofit(gson: com.google.gson.Gson): Retrofit {
         return Retrofit.Builder()
             .baseUrl("https://ws.audioscrobbler.com/")
-            .addConverterFactory(GsonConverterFactory.create(gson.create()))
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 
