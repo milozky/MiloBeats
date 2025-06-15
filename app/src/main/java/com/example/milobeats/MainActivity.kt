@@ -2,12 +2,12 @@ package com.example.milobeats
 
 import android.content.res.Configuration
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +27,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,10 +46,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,6 +58,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -69,8 +67,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.milobeats.data.model.Track
-import com.example.milobeats.presentation.viewmodel.TrackViewModel
 import com.example.milobeats.ui.theme.MiloBeatsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -79,28 +79,100 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         setContent {
             MiloBeatsTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: TrackViewModel = hiltViewModel()
-                    val tracks by viewModel.tracks.collectAsState()
-                    val isLoading by viewModel.isLoading.collectAsState()
-                    val error by viewModel.error.collectAsState()
+                    val viewModel: MainViewModel = hiltViewModel()
+                    MainScreen(viewModel)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MainScreen(viewModel: MainViewModel) {
+    var currentScreen by remember { mutableStateOf(0) }
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle(initialValue = "")
+    val searchResults by viewModel.searchResults.collectAsStateWithLifecycle(initialValue = emptyList())
+    val selectedTrack by viewModel.selectedTrack.collectAsStateWithLifecycle(initialValue = null)
+    val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle(initialValue = false)
+    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle(initialValue = 0L)
+    val duration by viewModel.duration.collectAsStateWithLifecycle(initialValue = 0L)
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = {
+            BottomNavigationBar(currentScreen, listOf("Search", "Play", "Home")) { index ->
+                currentScreen = index
+            }
+        },
+        containerColor = Color.Black
+    ) { innerPadding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .padding(innerPadding)
+        ) {
+            when (currentScreen) {
+                0 -> { // Search screen
+                    SearchScreen(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = { query ->
+                            viewModel.updateSearchQuery(query)
+                            viewModel.searchTracks(query) // Trigger search on query change
+                        },
+                        onSearch = { query -> viewModel.searchTracks(query) },
+                        searchResults = searchResults,
+                        onTrackClick = { track ->
+                            viewModel.selectTrack(track)
+                            currentScreen = 1
+                        }
+                    )
+                }
+
+                1 -> { // Play screen
+                    selectedTrack?.let { track ->
+                        PlayScreen(
+                            track = track,
+                            isPlaying = isPlaying,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            onPlayPause = viewModel::togglePlayback,
+                            onSeek = viewModel::seekTo
+                        )
+                    } ?: run {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "No track selected",
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                2 -> { // Home screen
                     HomeScreen(
-                        tracks = tracks,
-                        isLoading = isLoading,
-                        error = error,
-                        onSearch = { query -> viewModel.searchTracks(query) }
+                        tracks = searchResults,
+                        isLoading = false,
+                        error = null,
+                        onSearch = viewModel::searchTracks,
+                        selectedTrack = selectedTrack,
+                        onTrackSelected = { track ->
+                            viewModel.selectTrack(track)
+                            currentScreen = 1
+                        }
                     )
                 }
             }
         }
-        // Perform a track search when the app starts
-        // LastFmApiClient.searchTrack("Believe", "e0eb17c73c6e01c0bfead7461250d9ce")
     }
 }
 
@@ -109,148 +181,28 @@ fun HomeScreen(
     tracks: List<Track>,
     isLoading: Boolean,
     error: String?,
-    onSearch: (String) -> Unit
+    onSearch: (String) -> Unit,
+    selectedTrack: Track?,
+    onTrackSelected: (Track) -> Unit
 ) {
-    var selectedItem by remember { mutableIntStateOf(0) }
-    val items = listOf("Play", "Search", "Home")
-
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    Scaffold(
-        topBar = {
-            TopAppBar(title = "Sesiones desde la loma")
-        },
-        bottomBar = {
-            BottomNavigationBar(selectedItem, items) { index ->
-                selectedItem = index
-            }
-        },
-        containerColor = Color.Transparent // Set to Transparent to allow gradient background
-    ) { innerPadding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color(0xFF004D40),
-                            Color(0xFF263238)
-                        )
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF004D40),
+                        Color(0xFF263238)
                     )
-                ) // Apply gradient
-                .padding(innerPadding)
+                )
+            )
+    ) {
+        TopAppBar(title = "Sesiones desde la loma")
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            when (selectedItem) {
-                0 -> { // Play screen
-                    if (isLandscape) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            horizontalArrangement = Arrangement.SpaceAround,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AlbumArtSection(modifier = Modifier.weight(0.4f))
-                            Column(
-                                modifier = Modifier
-                                    .weight(0.6f),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Top
-                            ) {
-                                SongDetailsSection(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(0.3f)
-                                        .padding(horizontal = 16.dp)
-                                )
-                                PlaybackControlsSection(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(0.5f)
-                                        .padding(bottom = 16.dp)
-                                )
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .weight(0.2f)
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    IconButton(onClick = { /* Handle cast */ }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Cast,
-                                            contentDescription = "Cast",
-                                            tint = Color.White
-                                        )
-                                    }
-                                    IconButton(onClick = { /* Handle share */ }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Share,
-                                            contentDescription = "Share",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            AlbumArtSection(modifier = Modifier.weight(0.6f))
-                            SongDetailsSection(
-                                modifier = Modifier
-                                    .padding(horizontal = 16.dp)
-                                    .weight(0.2f)
-                            )
-                            PlaybackControlsSection(
-                                modifier = Modifier
-                                    .padding(bottom = 16.dp)
-                                    .weight(0.2f)
-                            )
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                IconButton(onClick = { /* Handle cast */ }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Cast,
-                                        contentDescription = "Cast",
-                                        tint = Color.White
-                                    )
-                                }
-                                IconButton(onClick = { /* Handle share */ }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Share,
-                                        contentDescription = "Share",
-                                        tint = Color.White
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                1 -> {
-                    SearchScreen(
-                        tracks = tracks,
-                        isLoading = isLoading,
-                        error = error,
-                        onSearch = onSearch
-                    ) // Search Screen
-                }
-
-                2 -> {
-                    Text("Home Screen", color = Color.White) // Home Screen Placeholder
-                }
-            }
+            Text("Home Screen", color = Color.White)
         }
     }
 }
@@ -283,32 +235,159 @@ fun TopAppBar(title: String) {
 }
 
 @Composable
-fun AlbumArtSection(modifier: Modifier = Modifier) {
+fun PlayScreen(
+    track: Track,
+    isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
+    onPlayPause: () -> Unit,
+    onSeek: (Long) -> Unit
+) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+
+    if (isLandscape) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AlbumArtSection(
+                modifier = Modifier.weight(0.4f),
+                imageUrl = track.image?.firstOrNull()?.url
+            )
+            Column(
+                modifier = Modifier.weight(0.6f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Top
+            ) {
+                SongDetailsSection(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.3f)
+                        .padding(horizontal = 16.dp),
+                    track = track,
+                    currentPosition = currentPosition,
+                    duration = duration,
+                    onSeek = onSeek
+                )
+                PlaybackControlsSection(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.5f)
+                        .padding(bottom = 16.dp),
+                    isPlaying = isPlaying,
+                    onPlayPause = onPlayPause
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(0.2f)
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { /* Handle cast */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Cast,
+                            contentDescription = "Cast",
+                            tint = Color.White
+                        )
+                    }
+                    IconButton(onClick = { /* Handle share */ }) {
+                        Icon(
+                            imageVector = Icons.Default.Share,
+                            contentDescription = "Share",
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            AlbumArtSection(
+                modifier = Modifier.weight(0.6f),
+                imageUrl = track.image?.firstOrNull()?.url
+            )
+            SongDetailsSection(
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .weight(0.2f),
+                track = track,
+                currentPosition = currentPosition,
+                duration = duration,
+                onSeek = onSeek
+            )
+            PlaybackControlsSection(
+                modifier = Modifier
+                    .padding(bottom = 16.dp)
+                    .weight(0.2f),
+                isPlaying = isPlaying,
+                onPlayPause = onPlayPause
+            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { /* Handle cast */ }) {
+                    Icon(
+                        imageVector = Icons.Default.Cast,
+                        contentDescription = "Cast",
+                        tint = Color.White
+                    )
+                }
+                IconButton(onClick = { /* Handle share */ }) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = "Share",
+                        tint = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AlbumArtSection(modifier: Modifier = Modifier, imageUrl: String?) {
     Box(
         modifier = modifier
             .fillMaxWidth()
             .padding(16.dp),
         contentAlignment = Alignment.Center
     ) {
-        // Placeholder for the album art image
-        // You'll replace this with your actual image later
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground), // Using default icon as placeholder
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(imageUrl ?: R.drawable.ic_launcher_foreground)
+                .crossfade(true)
+                .build(),
             contentDescription = "Album Art",
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth(0.9f)
-                .then(if (isLandscape) Modifier.height(180.dp) else Modifier) // Reduced height in landscape
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color.Gray) // Placeholder background
+                .background(Color.Gray),
+            error = painterResource(id = R.drawable.ic_launcher_foreground)
         )
     }
 }
 
 @Composable
-fun SongDetailsSection(modifier: Modifier = Modifier) {
+fun SongDetailsSection(
+    modifier: Modifier = Modifier,
+    track: Track,
+    currentPosition: Long,
+    duration: Long,
+    onSeek: (Long) -> Unit
+) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -317,12 +396,16 @@ fun SongDetailsSection(modifier: Modifier = Modifier) {
         ) {
             Column {
                 Text(
-                    text = "Montón de Estrellas",
+                    text = track.name ?: "Unknown Track",
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
-                Text(text = "Norbert", color = Color.LightGray, fontSize = 16.sp)
+                Text(
+                    text = track.artist ?: "Unknown Artist",
+                    color = Color.LightGray,
+                    fontSize = 16.sp
+                )
             }
             Row {
                 IconButton(onClick = { /* Handle subtract */ }) {
@@ -330,22 +413,26 @@ fun SongDetailsSection(modifier: Modifier = Modifier) {
                         painter = painterResource(id = android.R.drawable.ic_delete),
                         contentDescription = "Subtract",
                         tint = Color.White
-                    ) // Placeholder
+                    )
                 }
                 IconButton(onClick = { /* Handle add */ }) {
                     Icon(
                         painter = painterResource(id = android.R.drawable.ic_input_add),
                         contentDescription = "Add",
                         tint = Color.White
-                    ) // Placeholder
+                    )
                 }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
-        var sliderPosition by remember { mutableFloatStateOf(0f) }
+
+        val progress = if (duration > 0) currentPosition.toFloat() / duration else 0f
         Slider(
-            value = sliderPosition,
-            onValueChange = { sliderPosition = it },
+            value = progress,
+            onValueChange = { newProgress ->
+                val newPosition = (newProgress * duration).toLong()
+                onSeek(newPosition)
+            },
             valueRange = 0f..1f,
             colors = androidx.compose.material3.SliderDefaults.colors(
                 thumbColor = Color.White,
@@ -358,14 +445,26 @@ fun SongDetailsSection(modifier: Modifier = Modifier) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(text = "3:48", color = Color.LightGray, fontSize = 12.sp)
-            Text(text = "-1:48", color = Color.LightGray, fontSize = 12.sp)
+            Text(
+                text = formatDuration(currentPosition),
+                color = Color.LightGray,
+                fontSize = 12.sp
+            )
+            Text(
+                text = "-${formatDuration(duration - currentPosition)}",
+                color = Color.LightGray,
+                fontSize = 12.sp
+            )
         }
     }
 }
 
 @Composable
-fun PlaybackControlsSection(modifier: Modifier = Modifier) {
+fun PlaybackControlsSection(
+    modifier: Modifier = Modifier,
+    isPlaying: Boolean,
+    onPlayPause: () -> Unit
+) {
     Row(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -380,15 +479,15 @@ fun PlaybackControlsSection(modifier: Modifier = Modifier) {
             )
         }
         IconButton(
-            onClick = { /* Handle play/pause */ },
-            modifier = Modifier.size(160.dp) // Ensure IconButton is large enough
+            onClick = onPlayPause,
+            modifier = Modifier.size(160.dp)
         ) {
             Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = "Play/Pause",
+                imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (isPlaying) "Pause" else "Play",
                 tint = Color.Black,
                 modifier = Modifier
-                    .size(80.dp) // Icon size matches parent IconButton
+                    .size(80.dp)
                     .clip(RoundedCornerShape(50))
                     .background(Color.White)
             )
@@ -402,6 +501,13 @@ fun PlaybackControlsSection(modifier: Modifier = Modifier) {
             )
         }
     }
+}
+
+private fun formatDuration(durationMs: Long): String {
+    val totalSeconds = durationMs / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
 }
 
 @Composable
@@ -441,23 +547,17 @@ fun BottomNavigationBar(
 
 @Composable
 fun SearchScreen(
-    tracks: List<Track>,
-    isLoading: Boolean,
-    error: String?,
-    onSearch: (String) -> Unit
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    onSearch: (String) -> Unit,
+    searchResults: List<Track>,
+    onTrackClick: (Track) -> Unit
 ) {
-    var currentSearchQuery by remember { mutableStateOf("") }
-
-    Log.d(
-        "SearchScreen",
-        "currentSearchQuery: $currentSearchQuery, tracks.size: ${tracks.size}, isLoading: $isLoading, error: $error"
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp),
-        horizontalAlignment = Alignment.Start, // Align content to the start
+        horizontalAlignment = Alignment.Start,
         verticalArrangement = Arrangement.Top
     ) {
         Row(
@@ -465,12 +565,12 @@ fun SearchScreen(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Image(
-                painter = painterResource(id = R.drawable.ic_launcher_foreground), // Placeholder for profile image
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
                 contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(40.dp)
                     .clip(RoundedCornerShape(50))
-                    .background(Color.Gray) // Placeholder background
+                    .background(Color.Gray)
             )
             Text(
                 text = "Search",
@@ -482,27 +582,19 @@ fun SearchScreen(
         }
         Spacer(modifier = Modifier.height(16.dp))
         SearchBarComposable(
-            searchQuery = currentSearchQuery,
-            onSearchQueryChange = { newQuery ->
-                currentSearchQuery = newQuery
-                onSearch(newQuery)
-            }
+            searchQuery = searchQuery,
+            onValueChange = onSearchQueryChange,
+            onSearch = { onSearch(searchQuery) }
         )
         Spacer(modifier = Modifier.height(16.dp))
 
-        if (isLoading) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color.White)
-            }
-        } else if (error != null) {
-            Text("Error: $error", color = Color.Red, modifier = Modifier.padding(top = 16.dp))
-        } else if (tracks.isNotEmpty()) {
+        if (searchResults.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(tracks) { track ->
-                    TrackItem(track = track)
+                items(searchResults) { track ->
+                    TrackItem(track = track, onTrackSelected = onTrackClick)
                 }
             }
-        } else if (currentSearchQuery.isEmpty()) { // Display "Start browsing" if no search query
+        } else if (searchQuery.isEmpty()) {
             Text(
                 text = "Start browsing",
                 color = Color.White,
@@ -512,7 +604,7 @@ fun SearchScreen(
                     .fillMaxWidth()
                     .padding(top = 16.dp)
             )
-        } else { // Display "No tracks found" if search query exists but no tracks are found
+        } else {
             Text(
                 text = "No tracks found",
                 color = Color.White,
@@ -529,12 +621,13 @@ fun SearchScreen(
 @Composable
 fun SearchBarComposable(
     searchQuery: String,
-    onSearchQueryChange: (String) -> Unit
+    onValueChange: (String) -> Unit,
+    onSearch: () -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     OutlinedTextField(
         value = searchQuery,
-        onValueChange = onSearchQueryChange,
+        onValueChange = onValueChange,
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(8.dp)),
@@ -560,7 +653,7 @@ fun SearchBarComposable(
         keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(
             onSearch = {
-                onSearchQueryChange(searchQuery)
+                onSearch()
                 keyboardController?.hide()
             }
         )
@@ -568,21 +661,29 @@ fun SearchBarComposable(
 }
 
 @Composable
-fun TrackItem(track: Track) {
+fun TrackItem(
+    track: Track,
+    onTrackSelected: (Track) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 8.dp),
+            .padding(vertical = 8.dp)
+            .clickable { onTrackSelected(track) },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground), // Using default icon as placeholder
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(track.image?.firstOrNull()?.url ?: R.drawable.ic_launcher_foreground)
+                .crossfade(true)
+                .build(),
             contentDescription = "Track Album Art",
             modifier = Modifier
                 .size(50.dp)
                 .clip(RoundedCornerShape(4.dp))
                 .background(Color.DarkGray),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            error = painterResource(id = R.drawable.ic_launcher_foreground)
         )
         Column(modifier = Modifier.padding(start = 16.dp)) {
             track.name?.let {
@@ -606,7 +707,9 @@ fun HomeScreenPreview() {
             tracks = emptyList(),
             isLoading = true,
             error = null,
-            onSearch = { _ -> }
+            onSearch = { _ -> },
+            selectedTrack = null,
+            onTrackSelected = { _ -> }
         )
     }
 }
