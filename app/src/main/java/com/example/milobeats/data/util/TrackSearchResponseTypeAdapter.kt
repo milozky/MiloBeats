@@ -77,7 +77,8 @@ private object TrackDeserializer {
             url = trackObject.get("url")?.asString,
             streamable = trackObject.get("streamable")?.asString,
             listeners = trackObject.get("listeners")?.asString,
-            image = ImageDeserializer.deserialize(trackObject)
+            image = ImageDeserializer.deserialize(trackObject),
+            previewUrl = trackObject.get("previewUrl")?.asString
         )
     }
 }

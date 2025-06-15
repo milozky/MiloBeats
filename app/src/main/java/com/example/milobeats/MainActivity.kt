@@ -47,7 +47,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainScreen(viewModel: MainViewModel) {
-    var currentScreen by remember { mutableStateOf(0) }
+    var currentScreen by remember { mutableIntStateOf(0) }
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle(initialValue = "")
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle(initialValue = emptyList())
     val selectedTrack by viewModel.selectedTrack.collectAsStateWithLifecycle(initialValue = null)
@@ -197,7 +197,6 @@ fun HomeScreen(
                 )
             )
     ) {
-        TopAppBar(title = "Sesiones desde la loma")
         Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
@@ -246,26 +245,81 @@ fun PlayScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    if (isLandscape) {
-        Row(
-            modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AlbumArtSection(
-                modifier = Modifier.weight(0.4f),
-                imageUrl = track.image?.firstOrNull()?.url
-            )
-            Column(
-                modifier = Modifier.weight(0.6f),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Top
+    Column(modifier = Modifier.fillMaxSize()) {
+        TopAppBar(title = track.name ?: "Now Playing")
+
+        if (isLandscape) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                AlbumArtSection(
+                    modifier = Modifier.weight(0.4f),
+                    imageUrl = track.image?.firstOrNull()?.url
+                )
+                Column(
+                    modifier = Modifier.weight(0.6f),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Top
+                ) {
+                    SongDetailsSection(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.3f)
+                            .padding(horizontal = 16.dp),
+                        track = track,
+                        currentPosition = currentPosition,
+                        duration = duration,
+                        onSeek = onSeek
+                    )
+                    PlaybackControlsSection(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.5f)
+                            .padding(bottom = 16.dp),
+                        isPlaying = isPlaying,
+                        onPlayPause = onPlayPause
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(0.2f)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { /* Handle cast */ }) {
+                            Icon(
+                                imageVector = Icons.Default.Cast,
+                                contentDescription = "Cast",
+                                tint = Color.White
+                            )
+                        }
+                        IconButton(onClick = { /* Handle share */ }) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = "Share",
+                                tint = Color.White
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                AlbumArtSection(
+                    modifier = Modifier.weight(0.6f),
+                    imageUrl = track.image?.firstOrNull()?.url
+                )
                 SongDetailsSection(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.3f)
-                        .padding(horizontal = 16.dp),
+                        .padding(horizontal = 16.dp)
+                        .weight(0.2f),
                     track = track,
                     currentPosition = currentPosition,
                     duration = duration,
@@ -273,16 +327,14 @@ fun PlayScreen(
                 )
                 PlaybackControlsSection(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(0.5f)
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 16.dp)
+                        .weight(0.2f),
                     isPlaying = isPlaying,
                     onPlayPause = onPlayPause
                 )
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(0.2f)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -301,55 +353,6 @@ fun PlayScreen(
                             tint = Color.White
                         )
                     }
-                }
-            }
-        }
-    } else {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            AlbumArtSection(
-                modifier = Modifier.weight(0.6f),
-                imageUrl = track.image?.firstOrNull()?.url
-            )
-            SongDetailsSection(
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .weight(0.2f),
-                track = track,
-                currentPosition = currentPosition,
-                duration = duration,
-                onSeek = onSeek
-            )
-            PlaybackControlsSection(
-                modifier = Modifier
-                    .padding(bottom = 16.dp)
-                    .weight(0.2f),
-                isPlaying = isPlaying,
-                onPlayPause = onPlayPause
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = { /* Handle cast */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Cast,
-                        contentDescription = "Cast",
-                        tint = Color.White
-                    )
-                }
-                IconButton(onClick = { /* Handle share */ }) {
-                    Icon(
-                        imageVector = Icons.Default.Share,
-                        contentDescription = "Share",
-                        tint = Color.White
-                    )
                 }
             }
         }
@@ -584,7 +587,7 @@ fun SearchScreen(
         SearchBarComposable(
             searchQuery = searchQuery,
             onValueChange = onSearchQueryChange,
-            onSearch = { onSearch(searchQuery) }
+            onSearch = onSearch
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -622,7 +625,7 @@ fun SearchScreen(
 fun SearchBarComposable(
     searchQuery: String,
     onValueChange: (String) -> Unit,
-    onSearch: () -> Unit
+    onSearch: (String) -> Unit
 ) {
     val keyboardController = LocalSoftwareKeyboardController.current
     OutlinedTextField(
@@ -653,7 +656,7 @@ fun SearchBarComposable(
         keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Search),
         keyboardActions = KeyboardActions(
             onSearch = {
-                onSearch()
+                onSearch(searchQuery)
                 keyboardController?.hide()
             }
         )

@@ -38,7 +38,8 @@ data class Track(
     val url: String?,
     val streamable: String?,
     val listeners: String?,
-    val image: List<Image>?
+    val image: List<Image>?,
+    val previewUrl: String? = null
 )
 
 data class Image(
