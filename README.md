@@ -110,4 +110,4 @@ Here's a fun easter egg in the code:
 
 ---
 
-Made with ❤️ by [Your Name] 
+Made with ❤️ by Milo 
