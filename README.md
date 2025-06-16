@@ -1,116 +1,31 @@
-# 🎵 MiloBeats - YouTube Music Player
-
-A modern Android music player app that lets you search and play music from YouTube. Built with Jetpack Compose and following MVVM architecture.
+# MiloBeats - YouTube Music Player 🎵
+A sleek Android music player that lets you search and play YouTube videos. Built with Jetpack Compose and MVVM architecture.
 
 ![video_2025-06-16_15-37-51](https://github.com/user-attachments/assets/16d67c50-01c6-474a-ae69-fd8c013fa11f)
 
+## Features ✨
+* Search and play YouTube music videos
+* Custom player with background playback
+* Modern Material 3 UI with dark theme
+* Responsive design for all screen sizes
 
-## ✨ Features
+## Getting Started 🚀
+* Clone the repo: `git clone https://github.com/yourusername/MiloBeats.git`
+* Get a YouTube Data API key and add it to `local.properties`
+* Build and run in Android Studio
 
-- 🎯 Search for music videos on YouTube
-- 🎬 Play videos with a beautiful custom player
-- 🎨 Modern Material 3 UI with dark theme
-- 🔄 Background playback support
-- 📱 Responsive design for all screen sizes
+## How to Use 🎮
+* Search for tracks: `viewModel.searchTracks("query")`
+* Play a track: `viewModel.selectTrack(track)`
 
-## 🚀 Getting Started
+## Tech Stuff 🏗️
+* MVVM architecture with clean architecture principles
+* Jetpack Compose, Hilt, Retrofit, Coil, and more
 
-### Prerequisites
+## Contribute 🤝
+Feel free to submit a Pull Request!
 
-- Android Studio Hedgehog (2023.1.1) or later
-- Android SDK 29 or higher
-- Kotlin 1.9.0 or higher
-- JDK 1.8 or higher
+## License 📝
+MIT License - see LICENSE for details.
 
-### Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/MiloBeats.git
-```
-
-2. Get a YouTube Data API key:
-   - Go to the [Google Cloud Console](https://console.cloud.google.com/)
-   - Create a new project or select an existing one
-   - Enable the YouTube Data API v3
-   - Create credentials (API key)
-   - Copy your API key
-
-3. Add your API key to `local.properties`:
-```properties
-youtubeApiKey=your_api_key_here
-```
-
-4. Build and run the project in Android Studio
-
-## 🎮 How to Use
-
-### Searching for Music
-
-```kotlin
-// Example of searching for tracks
-viewModel.searchTracks("query")
-```
-
-The app will display search results with:
-- Video thumbnail
-- Title
-- Channel name
-- Duration
-
-### Playing Music
-
-```kotlin
-// Example of playing a track
-viewModel.selectTrack(track)
-viewModel.togglePlayback()
-```
-
-The player supports:
-- Play/Pause
-- Skip forward/backward
-- Full-screen mode
-- Background playback
-
-## 🏗️ Architecture
-
-The app follows MVVM architecture with clean architecture principles:
-
-- **Presentation Layer**: UI components and ViewModels
-- **Domain Layer**: Use cases and business logic
-- **Data Layer**: Repositories and data sources
-
-### Key Components
-
-- `MusicPlayerViewModel`: Manages player state and user interactions
-- `YouTubeMusicRepository`: Handles YouTube API communication
-- `VideoPlayer`: Custom YouTube player component
-- `Track`: Data model for music tracks
-
-## 🛠️ Dependencies
-
-- Jetpack Compose for UI
-- Hilt for dependency injection
-- Retrofit for API calls
-- Coil for image loading
-- YouTube Player Core for video playback
-- Coroutines for asynchronous operations
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🎁 Gift
-
-Here's a fun easter egg in the code:
-```kotlin
-// Try searching for "rick astley" in the app 😉
-```
-
----
-
-Made with ❤️ by Milo 
+Made with ❤️ by Milo
