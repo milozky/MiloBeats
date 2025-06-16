@@ -25,11 +25,9 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.outlined.Home
@@ -70,7 +68,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.milobeats.data.model.Track
+import com.example.milobeats.data.api.VideoItem
+import com.example.milobeats.presentation.components.VideoPlayer
+import com.example.milobeats.presentation.viewmodel.YouTubePlayerViewModel
 import com.example.milobeats.ui.theme.MiloBeatsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: MainViewModel = hiltViewModel()
+                    val viewModel: YouTubePlayerViewModel = hiltViewModel()
                     MainScreen(viewModel)
                 }
             }
@@ -94,14 +94,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(viewModel: MainViewModel) {
+fun MainScreen(viewModel: YouTubePlayerViewModel) {
     var currentScreen by remember { mutableIntStateOf(0) }
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle(initialValue = "")
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle(initialValue = emptyList())
-    val selectedTrack by viewModel.selectedTrack.collectAsStateWithLifecycle(initialValue = null)
+    val selectedVideo by viewModel.selectedVideo.collectAsStateWithLifecycle(initialValue = null)
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle(initialValue = false)
-    val currentPosition by viewModel.currentPosition.collectAsStateWithLifecycle(initialValue = 0L)
-    val duration by viewModel.duration.collectAsStateWithLifecycle(initialValue = 0L)
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -124,26 +122,22 @@ fun MainScreen(viewModel: MainViewModel) {
                         searchQuery = searchQuery,
                         onSearchQueryChange = { query ->
                             viewModel.updateSearchQuery(query)
-                            viewModel.searchTracks(query) // Trigger search on query change
+                            viewModel.searchVideos(query)
                         },
-                        onSearch = { query -> viewModel.searchTracks(query) },
+                        onSearch = { query -> viewModel.searchVideos(query) },
                         searchResults = searchResults,
-                        onTrackClick = { track ->
-                            viewModel.selectTrack(track)
+                        onVideoClick = { video ->
+                            viewModel.selectVideo(video)
                             currentScreen = 1
                         }
                     )
                 }
-
                 1 -> { // Play screen
-                    selectedTrack?.let { track ->
+                    selectedVideo?.let { video ->
                         PlayScreen(
-                            track = track,
+                            video = video,
                             isPlaying = isPlaying,
-                            currentPosition = currentPosition,
-                            duration = duration,
-                            onPlayPause = viewModel::togglePlayback,
-                            onSeek = viewModel::seekTo
+                            onPlayPause = viewModel::togglePlayback
                         )
                     } ?: run {
                         Box(
@@ -151,22 +145,21 @@ fun MainScreen(viewModel: MainViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No track selected",
+                                text = "No video selected",
                                 color = Color.White
                             )
                         }
                     }
                 }
-
                 2 -> { // Home screen
                     HomeScreen(
-                        tracks = searchResults,
+                        videos = searchResults,
                         isLoading = false,
                         error = null,
-                        onSearch = viewModel::searchTracks,
-                        selectedTrack = selectedTrack,
-                        onTrackSelected = { track ->
-                            viewModel.selectTrack(track)
+                        onSearch = viewModel::searchVideos,
+                        selectedVideo = selectedVideo,
+                        onVideoSelected = { video ->
+                            viewModel.selectVideo(video)
                             currentScreen = 1
                         }
                     )
@@ -178,12 +171,12 @@ fun MainScreen(viewModel: MainViewModel) {
 
 @Composable
 fun HomeScreen(
-    tracks: List<Track>,
+    videos: List<VideoItem>,
     isLoading: Boolean,
     error: String?,
     onSearch: (String) -> Unit,
-    selectedTrack: Track?,
-    onTrackSelected: (Track) -> Unit
+    selectedVideo: VideoItem?,
+    onVideoSelected: (VideoItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -235,18 +228,15 @@ fun TopAppBar(title: String) {
 
 @Composable
 fun PlayScreen(
-    track: Track,
+    video: VideoItem,
     isPlaying: Boolean,
-    currentPosition: Long,
-    duration: Long,
-    onPlayPause: () -> Unit,
-    onSeek: (Long) -> Unit
+    onPlayPause: () -> Unit
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = track.name ?: "Now Playing")
+        TopAppBar(title = video.snippet.title)
 
         if (isLandscape) {
             Row(
@@ -254,24 +244,21 @@ fun PlayScreen(
                 horizontalArrangement = Arrangement.SpaceAround,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AlbumArtSection(
-                    modifier = Modifier.weight(0.4f),
-                    imageUrl = track.image?.firstOrNull()?.url
+                VideoPlayer(
+                    videoId = video.id.videoId,
+                    modifier = Modifier.weight(0.4f)
                 )
                 Column(
                     modifier = Modifier.weight(0.6f),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top
                 ) {
-                    SongDetailsSection(
+                    VideoDetailsSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(0.3f)
                             .padding(horizontal = 16.dp),
-                        track = track,
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        onSeek = onSeek
+                        video = video
                     )
                     PlaybackControlsSection(
                         modifier = Modifier
@@ -281,29 +268,6 @@ fun PlayScreen(
                         isPlaying = isPlaying,
                         onPlayPause = onPlayPause
                     )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(0.2f)
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { /* Handle cast */ }) {
-                            Icon(
-                                imageVector = Icons.Default.Cast,
-                                contentDescription = "Cast",
-                                tint = Color.White
-                            )
-                        }
-                        IconButton(onClick = { /* Handle share */ }) {
-                            Icon(
-                                imageVector = Icons.Default.Share,
-                                contentDescription = "Share",
-                                tint = Color.White
-                            )
-                        }
-                    }
                 }
             }
         } else {
@@ -312,18 +276,15 @@ fun PlayScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                AlbumArtSection(
-                    modifier = Modifier.weight(0.6f),
-                    imageUrl = track.image?.firstOrNull()?.url
+                VideoPlayer(
+                    videoId = video.id.videoId,
+                    modifier = Modifier.weight(0.6f)
                 )
-                SongDetailsSection(
+                VideoDetailsSection(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .weight(0.2f),
-                    track = track,
-                    currentPosition = currentPosition,
-                    duration = duration,
-                    onSeek = onSeek
+                    video = video
                 )
                 PlaybackControlsSection(
                     modifier = Modifier
@@ -332,35 +293,16 @@ fun PlayScreen(
                     isPlaying = isPlaying,
                     onPlayPause = onPlayPause
                 )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(onClick = { /* Handle cast */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Cast,
-                            contentDescription = "Cast",
-                            tint = Color.White
-                        )
-                    }
-                    IconButton(onClick = { /* Handle share */ }) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = "Share",
-                            tint = Color.White
-                        )
-                    }
-                }
             }
         }
     }
 }
 
 @Composable
-fun AlbumArtSection(modifier: Modifier = Modifier, imageUrl: String?) {
+fun VideoThumbnailSection(
+    modifier: Modifier = Modifier,
+    thumbnailUrl: String
+) {
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -369,10 +311,10 @@ fun AlbumArtSection(modifier: Modifier = Modifier, imageUrl: String?) {
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(imageUrl ?: R.drawable.ic_launcher_foreground)
+                .data(thumbnailUrl)
                 .crossfade(true)
                 .build(),
-            contentDescription = "Album Art",
+            contentDescription = "Video Thumbnail",
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxWidth(0.9f)
@@ -384,12 +326,9 @@ fun AlbumArtSection(modifier: Modifier = Modifier, imageUrl: String?) {
 }
 
 @Composable
-fun SongDetailsSection(
+fun VideoDetailsSection(
     modifier: Modifier = Modifier,
-    track: Track,
-    currentPosition: Long,
-    duration: Long,
-    onSeek: (Long) -> Unit
+    video: VideoItem
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -399,13 +338,13 @@ fun SongDetailsSection(
         ) {
             Column {
                 Text(
-                    text = track.name ?: "Unknown Track",
+                    text = video.snippet.title,
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = track.artist ?: "Unknown Artist",
+                    text = video.snippet.channelTitle,
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -426,38 +365,6 @@ fun SongDetailsSection(
                     )
                 }
             }
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val progress = if (duration > 0) currentPosition.toFloat() / duration else 0f
-        Slider(
-            value = progress,
-            onValueChange = { newProgress ->
-                val newPosition = (newProgress * duration).toLong()
-                onSeek(newPosition)
-            },
-            valueRange = 0f..1f,
-            colors = androidx.compose.material3.SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Color.White,
-                inactiveTrackColor = Color.DarkGray
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formatDuration(currentPosition),
-                color = Color.LightGray,
-                fontSize = 12.sp
-            )
-            Text(
-                text = "-${formatDuration(duration - currentPosition)}",
-                color = Color.LightGray,
-                fontSize = 12.sp
-            )
         }
     }
 }
@@ -553,8 +460,8 @@ fun SearchScreen(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
-    searchResults: List<Track>,
-    onTrackClick: (Track) -> Unit
+    searchResults: List<VideoItem>,
+    onVideoClick: (VideoItem) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -593,8 +500,8 @@ fun SearchScreen(
 
         if (searchResults.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(searchResults) { track ->
-                    TrackItem(track = track, onTrackSelected = onTrackClick)
+                items(searchResults) { video ->
+                    VideoItem(video = video, onVideoSelected = onVideoClick)
                 }
             }
         } else if (searchQuery.isEmpty()) {
@@ -609,7 +516,7 @@ fun SearchScreen(
             )
         } else {
             Text(
-                text = "No tracks found",
+                text = "No videos found",
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -664,23 +571,23 @@ fun SearchBarComposable(
 }
 
 @Composable
-fun TrackItem(
-    track: Track,
-    onTrackSelected: (Track) -> Unit
+fun VideoItem(
+    video: VideoItem,
+    onVideoSelected: (VideoItem) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable { onTrackSelected(track) },
+            .clickable { onVideoSelected(video) },
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(track.image?.firstOrNull()?.url ?: R.drawable.ic_launcher_foreground)
+                .data(video.snippet.thumbnails.medium.url)
                 .crossfade(true)
                 .build(),
-            contentDescription = "Track Album Art",
+            contentDescription = "Video Thumbnail",
             modifier = Modifier
                 .size(50.dp)
                 .clip(RoundedCornerShape(4.dp))
@@ -689,15 +596,17 @@ fun TrackItem(
             error = painterResource(id = R.drawable.ic_launcher_foreground)
         )
         Column(modifier = Modifier.padding(start = 16.dp)) {
-            track.name?.let {
-                Text(
-                    text = it,
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-            track.artist?.let { Text(text = it, color = Color.LightGray, fontSize = 14.sp) }
+            Text(
+                text = video.snippet.title,
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = video.snippet.channelTitle,
+                color = Color.LightGray,
+                fontSize = 14.sp
+            )
         }
     }
 }
@@ -707,12 +616,12 @@ fun TrackItem(
 fun HomeScreenPreview() {
     MiloBeatsTheme {
         HomeScreen(
-            tracks = emptyList(),
+            videos = emptyList(),
             isLoading = true,
             error = null,
             onSearch = { _ -> },
-            selectedTrack = null,
-            onTrackSelected = { _ -> }
+            selectedVideo = null,
+            onVideoSelected = { _ -> }
         )
     }
 }
