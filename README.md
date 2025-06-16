@@ -2,6 +2,9 @@
 
 A modern Android music player app that lets you search and play music from YouTube. Built with Jetpack Compose and following MVVM architecture.
 
+![video_2025-06-16_15-37-51](https://github.com/user-attachments/assets/16d67c50-01c6-474a-ae69-fd8c013fa11f)
+
+
 ## ✨ Features
 
 - 🎯 Search for music videos on YouTube
