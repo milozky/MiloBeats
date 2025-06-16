@@ -1,7 +1,7 @@
 package com.example.milobeats.di
 
-import com.example.milobeats.data.repository.YouTubeRepositoryImpl
-import com.example.milobeats.domain.repository.YouTubeRepository
+import com.example.milobeats.data.repository.YouTubeMusicRepository
+import com.example.milobeats.domain.repository.MusicRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -14,7 +14,7 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
-    abstract fun bindYouTubeRepository(
-        youTubeRepositoryImpl: YouTubeRepositoryImpl
-    ): YouTubeRepository
+    abstract fun bindMusicRepository(
+        youTubeMusicRepository: YouTubeMusicRepository
+    ): MusicRepository
 } 

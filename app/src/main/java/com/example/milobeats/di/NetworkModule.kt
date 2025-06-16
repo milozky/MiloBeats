@@ -29,10 +29,4 @@ object NetworkModule {
             .build()
             .create(YouTubeApiService::class.java)
     }
-
-    @Provides
-    @Singleton
-    fun provideYouTubeApiKey(): String {
-        return BuildConfig.YOUTUBE_API_KEY
-    }
 } 

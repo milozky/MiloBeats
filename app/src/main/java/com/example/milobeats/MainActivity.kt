@@ -68,9 +68,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.example.milobeats.data.api.VideoItem
+import com.example.milobeats.domain.model.Track
 import com.example.milobeats.presentation.components.VideoPlayer
-import com.example.milobeats.presentation.viewmodel.YouTubePlayerViewModel
+import com.example.milobeats.presentation.viewmodel.MusicPlayerViewModel
 import com.example.milobeats.ui.theme.MiloBeatsTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -85,7 +85,7 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val viewModel: YouTubePlayerViewModel = hiltViewModel()
+                    val viewModel: MusicPlayerViewModel = hiltViewModel()
                     MainScreen(viewModel)
                 }
             }
@@ -94,11 +94,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun MainScreen(viewModel: YouTubePlayerViewModel) {
+fun MainScreen(viewModel: MusicPlayerViewModel) {
     var currentScreen by remember { mutableIntStateOf(0) }
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle(initialValue = "")
     val searchResults by viewModel.searchResults.collectAsStateWithLifecycle(initialValue = emptyList())
-    val selectedVideo by viewModel.selectedVideo.collectAsStateWithLifecycle(initialValue = null)
+    val selectedTrack by viewModel.selectedTrack.collectAsStateWithLifecycle(initialValue = null)
     val isPlaying by viewModel.isPlaying.collectAsStateWithLifecycle(initialValue = false)
 
     Scaffold(
@@ -122,20 +122,20 @@ fun MainScreen(viewModel: YouTubePlayerViewModel) {
                         searchQuery = searchQuery,
                         onSearchQueryChange = { query ->
                             viewModel.updateSearchQuery(query)
-                            viewModel.searchVideos(query)
+                            viewModel.searchTracks(query)
                         },
-                        onSearch = { query -> viewModel.searchVideos(query) },
+                        onSearch = { query -> viewModel.searchTracks(query) },
                         searchResults = searchResults,
-                        onVideoClick = { video ->
-                            viewModel.selectVideo(video)
+                        onTrackClick = {
+                            viewModel.selectTrack(it)
                             currentScreen = 1
                         }
                     )
                 }
                 1 -> { // Play screen
-                    selectedVideo?.let { video ->
+                    selectedTrack?.let { track ->
                         PlayScreen(
-                            video = video,
+                            track = track,
                             isPlaying = isPlaying,
                             onPlayPause = viewModel::togglePlayback
                         )
@@ -145,24 +145,14 @@ fun MainScreen(viewModel: YouTubePlayerViewModel) {
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "No video selected",
+                                text = "No track selected",
                                 color = Color.White
                             )
                         }
                     }
                 }
                 2 -> { // Home screen
-                    HomeScreen(
-                        videos = searchResults,
-                        isLoading = false,
-                        error = null,
-                        onSearch = viewModel::searchVideos,
-                        selectedVideo = selectedVideo,
-                        onVideoSelected = { video ->
-                            viewModel.selectVideo(video)
-                            currentScreen = 1
-                        }
-                    )
+                    HomeScreen()
                 }
             }
         }
@@ -170,14 +160,7 @@ fun MainScreen(viewModel: YouTubePlayerViewModel) {
 }
 
 @Composable
-fun HomeScreen(
-    videos: List<VideoItem>,
-    isLoading: Boolean,
-    error: String?,
-    onSearch: (String) -> Unit,
-    selectedVideo: VideoItem?,
-    onVideoSelected: (VideoItem) -> Unit
-) {
+fun HomeScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -228,7 +211,7 @@ fun TopAppBar(title: String) {
 
 @Composable
 fun PlayScreen(
-    video: VideoItem,
+    track: Track,
     isPlaying: Boolean,
     onPlayPause: () -> Unit
 ) {
@@ -236,7 +219,7 @@ fun PlayScreen(
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(title = video.snippet.title)
+        TopAppBar(title = track.title)
 
         if (isLandscape) {
             Row(
@@ -245,7 +228,7 @@ fun PlayScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 VideoPlayer(
-                    videoId = video.id.videoId,
+                    videoId = track.id,
                     modifier = Modifier.weight(0.4f)
                 )
                 Column(
@@ -258,7 +241,7 @@ fun PlayScreen(
                             .fillMaxWidth()
                             .weight(0.3f)
                             .padding(horizontal = 16.dp),
-                        video = video
+                        track = track
                     )
                     PlaybackControlsSection(
                         modifier = Modifier
@@ -277,14 +260,14 @@ fun PlayScreen(
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
                 VideoPlayer(
-                    videoId = video.id.videoId,
+                    videoId = track.id,
                     modifier = Modifier.weight(0.6f)
                 )
                 VideoDetailsSection(
                     modifier = Modifier
                         .padding(horizontal = 16.dp)
                         .weight(0.2f),
-                    video = video
+                    track = track
                 )
                 PlaybackControlsSection(
                     modifier = Modifier
@@ -328,7 +311,7 @@ fun VideoThumbnailSection(
 @Composable
 fun VideoDetailsSection(
     modifier: Modifier = Modifier,
-    video: VideoItem
+    track: Track
 ) {
     Column(modifier = modifier.fillMaxWidth()) {
         Row(
@@ -338,13 +321,13 @@ fun VideoDetailsSection(
         ) {
             Column {
                 Text(
-                    text = video.snippet.title,
+                    text = track.title,
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = video.snippet.channelTitle,
+                    text = track.artist,
                     color = Color.LightGray,
                     fontSize = 16.sp
                 )
@@ -460,8 +443,8 @@ fun SearchScreen(
     searchQuery: String,
     onSearchQueryChange: (String) -> Unit,
     onSearch: (String) -> Unit,
-    searchResults: List<VideoItem>,
-    onVideoClick: (VideoItem) -> Unit
+    searchResults: List<Track>,
+    onTrackClick: (Track) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -500,8 +483,8 @@ fun SearchScreen(
 
         if (searchResults.isNotEmpty()) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(searchResults) { video ->
-                    VideoItem(video = video, onVideoSelected = onVideoClick)
+                items(searchResults) { track ->
+                    TrackItem(track = track, onTrackSelected = onTrackClick)
                 }
             }
         } else if (searchQuery.isEmpty()) {
@@ -516,7 +499,7 @@ fun SearchScreen(
             )
         } else {
             Text(
-                text = "No videos found",
+                text = "No tracks found",
                 color = Color.White,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
@@ -571,23 +554,23 @@ fun SearchBarComposable(
 }
 
 @Composable
-fun VideoItem(
-    video: VideoItem,
-    onVideoSelected: (VideoItem) -> Unit
+fun TrackItem(
+    track: Track,
+    onTrackSelected: (Track) -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable { onVideoSelected(video) },
+            .clickable { onTrackSelected(track) },
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(video.snippet.thumbnails.medium.url)
+                .data(track.thumbnailUrl)
                 .crossfade(true)
                 .build(),
-            contentDescription = "Video Thumbnail",
+            contentDescription = "Track Thumbnail",
             modifier = Modifier
                 .size(50.dp)
                 .clip(RoundedCornerShape(4.dp))
@@ -597,13 +580,13 @@ fun VideoItem(
         )
         Column(modifier = Modifier.padding(start = 16.dp)) {
             Text(
-                text = video.snippet.title,
+                text = track.title,
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = video.snippet.channelTitle,
+                text = track.artist,
                 color = Color.LightGray,
                 fontSize = 14.sp
             )
@@ -615,13 +598,6 @@ fun VideoItem(
 @Composable
 fun HomeScreenPreview() {
     MiloBeatsTheme {
-        HomeScreen(
-            videos = emptyList(),
-            isLoading = true,
-            error = null,
-            onSearch = { _ -> },
-            selectedVideo = null,
-            onVideoSelected = { _ -> }
-        )
+        HomeScreen()
     }
 }

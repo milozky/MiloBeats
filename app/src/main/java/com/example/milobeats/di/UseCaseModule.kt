@@ -1,7 +1,7 @@
 package com.example.milobeats.di
 
-import com.example.milobeats.domain.usecase.SearchYouTubeVideosUseCase
-import com.example.milobeats.domain.usecase.SearchYouTubeVideosUseCaseImpl
+import com.example.milobeats.domain.usecase.SearchTracksUseCase
+import com.example.milobeats.domain.usecase.SearchTracksUseCaseImpl
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -13,7 +13,7 @@ import javax.inject.Singleton
 abstract class UseCaseModule {
     @Binds
     @Singleton
-    abstract fun bindSearchYouTubeVideosUseCase(
-        searchYouTubeVideosUseCaseImpl: SearchYouTubeVideosUseCaseImpl
-    ): SearchYouTubeVideosUseCase
+    abstract fun bindSearchTracksUseCase(
+        searchTracksUseCaseImpl: SearchTracksUseCaseImpl
+    ): SearchTracksUseCase
 } 
